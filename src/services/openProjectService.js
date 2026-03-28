@@ -1,11 +1,13 @@
 const axios = require('axios');
+const { getConfig } = require('./configService');
 
 const getAxiosInstance = () => {
+  const config = getConfig();
   return axios.create({
-    baseURL: process.env.OPENPROJECT_API_URL,
+    baseURL: config.OPENPROJECT_API_URL,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Basic ${Buffer.from(`apikey:${process.env.OPENPROJECT_API_KEY}`).toString('base64')}`,
+      Authorization: `Basic ${Buffer.from(`apikey:${config.OPENPROJECT_API_KEY}`).toString('base64')}`,
     },
   });
 };
@@ -39,12 +41,16 @@ const createWorkPackage = async (projectId, workPackageData) => {
 
 const integrateProjectData = async (aiData) => {
   try {
-    const project = await createProject(aiData);
+    const targetProjectId = aiData.projectId;
+
+    if (!targetProjectId) {
+        throw new Error('Project ID is required to sync data');
+    }
 
     const summaryTasksMap = {};
 
     for (const summaryTask of aiData.summaryTasks || []) {
-       const wp = await createWorkPackage(project.id, {
+       const wp = await createWorkPackage(targetProjectId, {
           subject: summaryTask.title,
           description: { format: 'markdown', raw: summaryTask.description || '' },
           startDate: summaryTask.startDate,
@@ -70,11 +76,11 @@ const integrateProjectData = async (aiData) => {
              parent: { href: `/api/v3/work_packages/${parentId}` }
          }
       }
-      const wp = await createWorkPackage(project.id, payload);
+      const wp = await createWorkPackage(targetProjectId, payload);
       individualTasksMap[task.id || task.title] = wp.id;
 
       for (const miniTask of task.miniTasks || []) {
-         await createWorkPackage(project.id, {
+         await createWorkPackage(targetProjectId, {
               subject: miniTask.title,
               description: { format: 'markdown', raw: miniTask.description || '' },
               estimatedTime: miniTask.estimatedTime,
@@ -86,7 +92,7 @@ const integrateProjectData = async (aiData) => {
     }
 
     for (const meeting of aiData.meetings || []) {
-       await createWorkPackage(project.id, {
+       await createWorkPackage(targetProjectId, {
            subject: meeting.title,
            description: { format: 'markdown', raw: meeting.description || '' },
            startDate: meeting.suggestedDate,
@@ -94,8 +100,18 @@ const integrateProjectData = async (aiData) => {
        });
     }
 
-    return { success: true, projectId: project.id };
+    return { success: true, projectId: targetProjectId };
 
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getProjects = async () => {
+  try {
+    const api = getAxiosInstance();
+    const response = await api.get('/api/v3/projects');
+    return response.data._embedded ? response.data._embedded.elements : [];
   } catch (error) {
     throw error;
   }
@@ -104,5 +120,6 @@ const integrateProjectData = async (aiData) => {
 module.exports = {
   integrateProjectData,
   createProject,
-  createWorkPackage
+  createWorkPackage,
+  getProjects
 };

@@ -1,6 +1,8 @@
 const axios = require('axios');
+const { getConfig } = require('./configService');
 
 const generateProjectPlan = async (projectData) => {
+  const config = getConfig();
   try {
     const prompt = `
       Analiza el siguiente proyecto:
@@ -17,15 +19,15 @@ const generateProjectPlan = async (projectData) => {
     `;
 
     const response = await axios.post(
-      process.env.AI_API_URL,
+      config.AI_API_URL,
       {
-        model: process.env.AI_MODEL || 'gpt-4',
+        model: config.AI_MODEL || 'gpt-4',
         messages: [{ role: 'user', content: prompt }],
       },
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.AI_API_KEY}`,
+          Authorization: `Bearer ${config.AI_API_KEY}`,
         },
       }
     );
