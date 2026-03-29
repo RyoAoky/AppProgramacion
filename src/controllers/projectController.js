@@ -5,13 +5,13 @@ const { broadcastStatus } = require('../services/statusService');
 
 const generatePlanning = async (req, res) => {
   try {
-    const { projectId, title, description, summaryTasks, individualTasks } = req.body;
+    const { projectId, title, description, startDate, summaryTasks, individualTasks } = req.body;
 
-    if (!projectId || !title || !description) {
+    if (!projectId || !title || !description || !startDate) {
       return res.status(400).json({ error: 'Missing required project data' });
     }
 
-    const projectData = { projectId, title, description, summaryTasks, individualTasks };
+    const projectData = { projectId, title, description, startDate, summaryTasks, individualTasks };
 
     broadcastStatus('Conectando con IA...');
     const aiPlan = await generateProjectPlan(projectData);

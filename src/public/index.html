@@ -70,6 +70,33 @@
     </div>
   </div>
 
+  <div class="modal fade" id="generationModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Generar Planeación IA</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="generationForm">
+            <div class="mb-3">
+              <label class="form-label" for="projectExplanation">Contexto / Explicación del Proyecto</label>
+              <textarea class="form-control" id="projectExplanation" rows="4" placeholder="Explica detalles adicionales que la IA debe considerar..." required></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="projectStartDate">Fecha de Inicio del Proyecto</label>
+              <input type="date" class="form-control" id="projectStartDate" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmGeneration">Iniciar IA</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="validationModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
       <div class="modal-content">

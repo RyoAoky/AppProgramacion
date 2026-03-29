@@ -5,11 +5,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const projectsTable = document.querySelector('#projectsTable tbody');
   const statusBar = document.getElementById('statusBar');
   const statusMessage = document.getElementById('statusMessage');
+  const generationModal = new bootstrap.Modal(document.getElementById('generationModal'));
+  const btnConfirmGeneration = document.getElementById('btnConfirmGeneration');
+  const projectExplanation = document.getElementById('projectExplanation');
+  const projectStartDate = document.getElementById('projectStartDate');
+
   const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
   const aiProposalContent = document.getElementById('aiProposalContent');
   const btnApproveSync = document.getElementById('btnApproveSync');
 
   let currentAIProposal = null;
+  let currentTargetProject = null;
 
   const showStatus = (msg, isError = false) => {
     statusBar.style.display = 'block';
@@ -90,10 +96,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.querySelectorAll('.btn-generate').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            const id = e.target.getAttribute('data-id');
-            const name = e.target.getAttribute('data-name');
-            await triggerAIGeneration(id, name);
+          btn.addEventListener('click', (e) => {
+            currentTargetProject = {
+              id: e.target.getAttribute('data-id'),
+              name: e.target.getAttribute('data-name')
+            };
+
+            projectExplanation.value = '';
+
+            const today = new Date();
+            projectStartDate.value = today.toISOString().split('T')[0];
+
+            generationModal.show();
           });
         });
       } else {
@@ -104,13 +118,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const triggerAIGeneration = async (projectId, projectName) => {
+  const confirmGeneration = async () => {
+    if (!currentTargetProject) return;
+
+    const explanation = projectExplanation.value.trim();
+    const startDate = projectStartDate.value;
+
+    if (!explanation || !startDate) {
+        alert('Debes ingresar la explicación y la fecha de inicio.');
+        return;
+    }
+
+    generationModal.hide();
+    await triggerAIGeneration(currentTargetProject.id, currentTargetProject.name, explanation, startDate);
+  };
+
+  const triggerAIGeneration = async (projectId, projectName, explanation, startDate) => {
     showStatus('Iniciando proceso...');
     try {
       const basePayload = {
         projectId: projectId,
         title: projectName,
-        description: `Planificación para el proyecto ${projectName}`,
+        description: explanation,
+        startDate: startDate,
         summaryTasks: [],
         individualTasks: []
       };
@@ -168,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   configForm.addEventListener('submit', updateConfig);
   refreshProjectsBtn.addEventListener('click', loadProjects);
+  btnConfirmGeneration.addEventListener('click', confirmGeneration);
   btnApproveSync.addEventListener('click', syncToOpenProject);
 
   loadConfig();

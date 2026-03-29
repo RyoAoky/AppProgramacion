@@ -22,7 +22,13 @@ const generateProjectPlan = async (projectData) => {
     const prompt = `
       Analiza el siguiente proyecto:
       Título: ${projectData.title}
-      Descripción: ${projectData.description}
+      Contexto/Explicación: ${projectData.description}
+      Fecha de Inicio del Proyecto: ${projectData.startDate}
+
+      Reglas de Tiempo de Negocio:
+      - Los días laborables son estrictamente de Lunes a Viernes.
+      - Hay 9 horas laborales por día, en el horario de 08:00 a 13:00 y de 14:00 a 18:00.
+      - Usa la fecha de inicio proporcionada para calcular las fechas subsecuentes.
 
       Aplica OBLIGATORIAMENTE la siguiente estructura base de fases y tareas:
       ${structureTemplate}
