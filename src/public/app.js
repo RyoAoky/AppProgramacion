@@ -75,11 +75,15 @@ document.addEventListener('DOMContentLoaded', () => {
       projectsTable.innerHTML = '';
       if (data && data.length > 0) {
         data.forEach(project => {
+          const prefix = project.level > 0 ? '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(project.level) + '↳ ' : '';
+          const safeDescription = project.description ? project.description.substring(0, 100) + (project.description.length > 100 ? '...' : '') : '';
+
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${project.id}</td>
-            <td>${project.name}</td>
+            <td>${prefix}${project.name}</td>
             <td>${project.identifier}</td>
+            <td>${safeDescription}</td>
             <td><button class="btn btn-sm btn-primary btn-generate" data-id="${project.id}" data-name="${project.name}">Generar Planeación IA</button></td>
           `;
           projectsTable.appendChild(tr);
@@ -93,10 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
       } else {
-         projectsTable.innerHTML = '<tr><td colspan="4" class="text-center">No hay proyectos.</td></tr>';
+         projectsTable.innerHTML = '<tr><td colspan="5" class="text-center">No hay proyectos.</td></tr>';
       }
     } catch (e) {
-      projectsTable.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${e.message}</td></tr>`;
+      projectsTable.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Error: ${e.message}</td></tr>`;
     }
   };
 
