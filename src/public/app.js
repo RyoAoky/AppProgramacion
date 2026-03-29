@@ -153,7 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const json = await res.json();
 
-      if (!res.ok) throw new Error(json.error || 'Fallo desconocido');
+      if (!res.ok) {
+        const errorDetails = typeof json.details === 'object' ? JSON.stringify(json.details, null, 2) : (json.details || '');
+        const errorMsg = json.error ? `${json.error}. ${errorDetails}` : 'Fallo desconocido';
+        throw new Error(errorMsg);
+      }
 
       currentAIProposal = json.data;
       aiProposalContent.textContent = JSON.stringify(currentAIProposal, null, 2);

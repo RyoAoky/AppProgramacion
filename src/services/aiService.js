@@ -3,6 +3,29 @@ const fs = require('fs');
 const path = require('path');
 const { getConfig } = require('./configService');
 
+const sanitizeFilename = (name) => name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+const logAITransaction = (projectId, projectName, reqData, resData, type) => {
+  try {
+    const rootDir = path.join(__dirname, '../../planeaciones');
+    if (!fs.existsSync(rootDir)) {
+      fs.mkdirSync(rootDir);
+    }
+
+    const projectFolder = path.join(rootDir, `${projectId}-${sanitizeFilename(projectName)}`);
+    if (!fs.existsSync(projectFolder)) {
+      fs.mkdirSync(projectFolder);
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filePath = path.join(projectFolder, `${timestamp}-${type}.json`);
+
+    fs.writeFileSync(filePath, JSON.stringify({ request: reqData, response: resData }, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Logging failed:', error);
+  }
+};
+
 const getProjectStructure = () => {
   try {
     const dataPath = path.join(__dirname, '../data/projectStructure.json');
@@ -41,12 +64,14 @@ const generateProjectPlan = async (projectData) => {
       5. Devuelve TODA la información OBLIGATORIAMENTE en un formato estructurado JSON puro conteniendo { "summaryTasks": [], "individualTasks": [], "meetings": [] }, sin ningún texto adicional ni marcadores markdown.
     `;
 
+    const requestPayload = {
+      model: config.AI_MODEL || 'gpt-4',
+      messages: [{ role: 'user', content: prompt }],
+    };
+
     const response = await axios.post(
       config.AI_API_URL,
-      {
-        model: config.AI_MODEL || 'gpt-4',
-        messages: [{ role: 'user', content: prompt }],
-      },
+      requestPayload,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -56,17 +81,28 @@ const generateProjectPlan = async (projectData) => {
     );
 
     const resultText = response.data.choices[0].message.content.trim();
+
+    logAITransaction(projectData.projectId, projectData.title, requestPayload, resultText, 'raw');
+
     let jsonResult;
     try {
         jsonResult = JSON.parse(resultText);
     } catch(e) {
         const jsonMatch = resultText.match(/```json\n([\s\S]*?)\n```/);
         if (jsonMatch) {
-            jsonResult = JSON.parse(jsonMatch[1]);
+            try {
+                jsonResult = JSON.parse(jsonMatch[1]);
+            } catch (innerE) {
+                logAITransaction(projectData.projectId, projectData.title, requestPayload, { error: 'Parse Error', rawText: resultText }, 'error');
+                throw new Error(`Invalid JSON format from AI after extraction: ${innerE.message}. Raw: ${resultText.substring(0, 100)}...`);
+            }
         } else {
-            throw new Error('Invalid JSON format from AI');
+            logAITransaction(projectData.projectId, projectData.title, requestPayload, { error: 'Parse Error', rawText: resultText }, 'error');
+            throw new Error(`Invalid JSON format from AI. No JSON code block found. Raw: ${resultText.substring(0, 100)}...`);
         }
     }
+
+    logAITransaction(projectData.projectId, projectData.title, requestPayload, jsonResult, 'success');
 
     return jsonResult;
   } catch (error) {

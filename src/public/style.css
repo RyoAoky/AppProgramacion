@@ -29,3 +29,8 @@ pre {
   max-height: 400px;
   overflow-y: auto;
 }
+
+#statusBar {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
