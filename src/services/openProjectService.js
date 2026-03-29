@@ -3,8 +3,15 @@ const { getConfig } = require('./configService');
 
 const getAxiosInstance = () => {
   const config = getConfig();
+  let base = config.OPENPROJECT_API_URL || '';
+  if (base.endsWith('/')) {
+    base = base.slice(0, -1);
+  }
+  if (base.endsWith('/api/v3')) {
+    base = base.slice(0, -7);
+  }
   return axios.create({
-    baseURL: config.OPENPROJECT_API_URL,
+    baseURL: base,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Basic ${Buffer.from(`apikey:${config.OPENPROJECT_API_KEY}`).toString('base64')}`,

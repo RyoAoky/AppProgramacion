@@ -66,7 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadProjects = async () => {
     try {
       const res = await fetch('/api/projects');
-      if (!res.ok) throw new Error('Falló al obtener proyectos');
+      if (!res.ok) {
+        const errData = await res.json();
+        const details = errData.details ? JSON.stringify(errData.details) : 'Error desconocido';
+        throw new Error(`Falló al obtener proyectos: ${details}`);
+      }
       const data = await res.json();
       projectsTable.innerHTML = '';
       if (data && data.length > 0) {

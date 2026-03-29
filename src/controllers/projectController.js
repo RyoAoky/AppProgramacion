@@ -25,9 +25,11 @@ const generatePlanning = async (req, res) => {
 
   } catch (error) {
     broadcastStatus('Error al conectar con IA');
-    return res.status(500).json({
+    const status = error.response ? error.response.status : 500;
+    const details = error.response && error.response.data ? error.response.data : error.message;
+    return res.status(status).json({
       error: 'An error occurred while generating the plan',
-      details: error.message || error.toString(),
+      details: details,
     });
   }
 };
@@ -50,9 +52,11 @@ const syncOpenProject = async (req, res) => {
 
   } catch (error) {
     broadcastStatus('Error al sincronizar con OpenProject');
-    return res.status(500).json({
+    const status = error.response ? error.response.status : 500;
+    const details = error.response && error.response.data ? error.response.data : error.message;
+    return res.status(status).json({
       error: 'An error occurred while syncing with OpenProject',
-      details: error.message || error.toString(),
+      details: details,
     });
   }
 };
