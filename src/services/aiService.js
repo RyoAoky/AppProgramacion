@@ -172,7 +172,7 @@ const generateProjectPlan = async (projectData) => {
     try {
         jsonResult = JSON.parse(resultText);
     } catch(e) {
-        const jsonMatch = resultText.match(/```json\n([\s\S]*?)\n```/);
+        const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
         if (jsonMatch) {
             try {
                 jsonResult = JSON.parse(jsonMatch[1]);

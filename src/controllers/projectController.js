@@ -78,7 +78,7 @@ const getProjectHistory = (req, res) => {
     const files = fs.readdirSync(folderPath);
 
     const successFiles = files
-      .filter(file => file.endsWith('-success.json'))
+      .filter(file => file.endsWith('-success.json') || file.endsWith('-raw.json'))
       .sort((a, b) => b.localeCompare(a));
 
     return res.json({ history: successFiles });
@@ -100,7 +100,21 @@ const getProjectHistoryDetail = (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
 
     const fileContent = fs.readFileSync(filePath, 'utf8');
-    const jsonData = JSON.parse(fileContent);
+    let jsonData = JSON.parse(fileContent);
+
+    if (filename.endsWith('-raw.json') && typeof jsonData.response === 'string') {
+        try {
+            const rawText = jsonData.response;
+            const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (jsonMatch) {
+               jsonData.response = JSON.parse(jsonMatch[1]);
+            } else {
+               jsonData.response = JSON.parse(rawText);
+            }
+        } catch (e) {
+            return res.status(400).json({ error: 'No se pudo parsear el formato RAW', details: e.message });
+        }
+    }
 
     return res.json({ data: jsonData });
   } catch (error) {
