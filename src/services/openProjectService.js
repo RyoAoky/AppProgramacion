@@ -73,10 +73,26 @@ const integrateProjectData = async (aiData) => {
         throw new Error('Project ID is required to sync data');
     }
 
+    const existingWorkPackages = await getProjectWorkPackages(targetProjectId);
+    const idMap = new Map();
+
+    for (const wp of existingWorkPackages) {
+        if (wp.subject) {
+            idMap.set(wp.subject.trim().toLowerCase(), wp.id);
+        }
+    }
+
     const tasksArray = Array.isArray(aiData) ? aiData : (aiData.tasks || []);
 
     for (const parentTask of tasksArray) {
-       if (!parentTask.id) continue;
+       let targetParentId = parentTask.id;
+       const parentSubjectKey = parentTask.asunto ? parentTask.asunto.trim().toLowerCase() : '';
+
+       if (idMap.has(parentSubjectKey)) {
+           targetParentId = idMap.get(parentSubjectKey);
+       }
+
+       if (!targetParentId) continue;
 
        const parentPayload = {};
        if (parentTask.fechaInicio) parentPayload.startDate = parentTask.fechaInicio;
@@ -84,11 +100,18 @@ const integrateProjectData = async (aiData) => {
        if (parentTask.horasEstimadas !== undefined) parentPayload.estimatedTime = `PT${parentTask.horasEstimadas}H`;
 
        if (Object.keys(parentPayload).length > 0) {
-           await updateWorkPackage(parentTask.id, parentPayload);
+           await updateWorkPackage(targetParentId, parentPayload);
        }
 
        for (const childTask of parentTask.hijos || []) {
-          if (!childTask.id) continue;
+          let targetChildId = childTask.id;
+          const childSubjectKey = childTask.asunto ? childTask.asunto.trim().toLowerCase() : '';
+
+          if (idMap.has(childSubjectKey)) {
+              targetChildId = idMap.get(childSubjectKey);
+          }
+
+          if (!targetChildId) continue;
 
           const childPayload = {};
           if (childTask.fechaInicio) childPayload.startDate = childTask.fechaInicio;
@@ -99,13 +122,39 @@ const integrateProjectData = async (aiData) => {
           }
 
           if (Object.keys(childPayload).length > 0) {
-              await updateWorkPackage(childTask.id, childPayload);
+              await updateWorkPackage(targetChildId, childPayload);
           }
        }
     }
 
     return { success: true, projectId: targetProjectId };
 
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getProjectWorkPackages = async (projectId) => {
+  try {
+    const api = getAxiosInstance();
+    let allWorkPackages = [];
+    let offset = 1;
+    const pageSize = 100;
+
+    while (true) {
+        const url = `/api/v3/projects/${projectId}/work_packages?pageSize=${pageSize}&offset=${offset}`;
+        const response = await api.get(url);
+
+        const elements = response.data._embedded ? response.data._embedded.elements : [];
+        allWorkPackages = allWorkPackages.concat(elements);
+
+        if (elements.length < pageSize) {
+            break;
+        }
+        offset++;
+    }
+
+    return allWorkPackages;
   } catch (error) {
     throw error;
   }
@@ -125,5 +174,6 @@ module.exports = {
   integrateProjectData,
   createProject,
   createWorkPackage,
-  getProjects
+  getProjects,
+  getProjectWorkPackages
 };
