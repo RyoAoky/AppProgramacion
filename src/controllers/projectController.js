@@ -20,7 +20,7 @@ const generatePlanning = async (req, res) => {
 
     return res.status(200).json({
       message: 'Plan generated successfully',
-      data: { ...projectData, ...aiPlan },
+      data: { projectId, tasks: aiPlan },
     });
 
   } catch (error) {

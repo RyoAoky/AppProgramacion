@@ -37,50 +37,132 @@ const getProjectStructure = () => {
   return '[]';
 };
 
+const obtenerEjemploPerfectoJSON = () => {
+  return JSON.stringify([
+    {
+      "id": 1618,
+      "asunto": "Inicio del Proyecto",
+      "tipo": "Tarea Resumen",
+      "fechaInicio": "2026-03-30",
+      "fechaFin": "2026-03-30",
+      "horasEstimadas": 3,
+      "hijos": [
+        {
+          "id": 1619,
+          "asunto": "Identificación de la necesidad o problema.",
+          "tipo": "Tarea",
+          "fechaInicio": "2026-03-30",
+          "fechaFin": "2026-03-30",
+          "horasEstimadas": 0.5,
+          "detalleTecnico": "- [ ] **[0.5h] Definición del módulo:** Validar integración del nuevo checklist en la intranet existente."
+        }
+      ]
+    },
+    {
+      "id": 1642,
+      "asunto": "Desarrollo / Construcción",
+      "tipo": "Tarea Resumen",
+      "fechaInicio": "2026-03-31",
+      "fechaFin": "2026-04-01",
+      "horasEstimadas": 12,
+      "hijos": [
+        {
+          "id": 1644,
+          "asunto": "Programación de módulos",
+          "tipo": "Tarea",
+          "fechaInicio": "2026-03-31",
+          "fechaFin": "2026-04-01",
+          "horasEstimadas": 6,
+          "detalleTecnico": "- [ ] **[4.0h] Desarrollo CRUD Insumos:** Construir ABM de insumos (Categoría, Nombre, ID, Estado).\n- [ ] **[2.0h] Desarrollo Frontend Checklist:** Crear vista principal y modal de búsqueda."
+        },
+        {
+          "id": 1645,
+          "asunto": "Integración de componentes",
+          "tipo": "Tarea",
+          "fechaInicio": "2026-04-01",
+          "fechaFin": "2026-04-01",
+          "horasEstimadas": 4,
+          "detalleTecnico": "- [ ] **[2.0h] Consumo de API HIS:** Conectar el input de búsqueda (nombre/prefactura) con el backend del HIS.\n- [ ] **[2.0h] Guardado de transacciones:** Vincular el checklist marcado con la prefactura importada."
+        }
+      ]
+    }
+  ]);
+};
+
 const generateProjectPlan = async (projectData) => {
   const config = getConfig();
   try {
     const structureTemplate = getProjectStructure();
+    const ejemploIdeal = obtenerEjemploPerfectoJSON();
 
     const prompt = `
-      Analiza el siguiente proyecto:
+      Eres un Project Manager Experto en metodologías ágiles.
+      Analiza y estima el siguiente proyecto:
+
       Título: ${projectData.title}
       Contexto/Explicación: ${projectData.description}
       Fecha de Inicio del Proyecto: ${projectData.startDate}
 
-      Reglas de Tiempo de Negocio:
-      - Los días laborables son estrictamente de Lunes a Viernes.
-      - Hay 9 horas laborales por día, en el horario de 08:00 a 13:00 y de 14:00 a 18:00.
-      - Usa la fecha de inicio proporcionada para calcular las fechas subsecuentes.
+      REGLAS DEL ENTORNO Y ESCALA DEL PROYECTO (¡ESTRICTAS!):
+      - Este es un MINI-PROYECTO integrado a una Intranet existente. No hay infraestructura desde cero.
+      - TIEMPOS ÁGILES: El total del proyecto debe rondar entre 20 y 45 horas en total. Sé agresivo optimizando.
+      - Burocracia mínima: Solo interactúan 1 Desarrollador, 1 Usuario Clave y 1 Subgerente.
+      - Fase de Soporte y Mantenimiento: 0 horas estimadas. No se cuantifica.
+      - Capacitación y Cierre: Máximo 1 a 2 horas en total.
 
-      Aplica OBLIGATORIAMENTE la siguiente estructura base de fases y tareas:
+      REGLAS DE TIEMPO DE NEGOCIO:
+      - Días laborables: Lunes a Viernes.
+      - Horario: 9 horas diarias (08:00 a 13:00 y 14:00 a 18:00).
+      - Las fechas ("fechaInicio", "fechaFin") deben calcularse de forma secuencial evitando fines de semana.
+
+      ESTRUCTURA BASE OBLIGATORIA (DEBES MANTENER LOS MISMOS IDs QUE VIENEN AQUÍ):
       ${structureTemplate}
 
-      Por favor, realiza lo siguiente basado en esa estructura:
-      1. Extrae las "Tareas Resumen" y colócalas en un array llamado "summaryTasks", estimando tiempos y fechas de inicio y fin para cada una. Usa la propiedad "title" (en lugar de "asunto").
-      2. Extrae las tareas "hijos" y colócalas en un array "individualTasks". Para cada tarea individual estima tiempos y fechas. Usa la propiedad "parentTitle" con el título exacto de la Tarea Resumen a la que pertenecen.
-      3. Analiza cada tarea individual y desglose proponiendo subtareas técnicas en un array "miniTasks" dentro del objeto de cada "individualTask".
-      4. Propón un cronograma de reuniones de seguimiento en un array "meetings" (con title, description y suggestedDate).
-      5. Devuelve TODA la información OBLIGATORIAMENTE en un formato estructurado JSON puro conteniendo { "summaryTasks": [], "individualTasks": [], "meetings": [] }, sin ningún texto adicional ni marcadores markdown.
+      INSTRUCCIONES DE SALIDA:
+      1. Extrae las tareas padre respetando su ID original, asígnales tiempos (horasEstimadas) y fechas.
+      2. Extrae las tareas "hijos" respetando su ID original, asigna "horasEstimadas" (en fracciones si es necesario, ej: 0.5) y fechas.
+      3. CRÍTICO: En cada tarea "hijo", crea una clave llamada "detalleTecnico". El valor debe ser un ÚNICO STRING en formato Markdown.
+         - Usa OBLIGATORIAMENTE la sintaxis: "- [ ] **[X.Xh] Asunto:** Descripción".
+         - REGLA MATEMÁTICA ESTRICTA: La suma de las horas indicadas entre corchetes [X.Xh] en el "detalleTecnico" DEBE SER EXACTAMENTE IGUAL al valor numérico de "horasEstimadas" de esa tarea hijo.
+      4. DEBES DEVOLVER UN ARREGLO JSON PURO CON ESTA ESTRUCTURA (NI MAS NI MENOS).
+
+      REFERENCIA DE FORMATO (EJEMPLO IDEAL):
+      ⚠️ ¡ADVERTENCIA CRÍTICA!: El siguiente JSON es SOLO un ejemplo de la ESTRUCTURA y el FORMATO Markdown que debes usar. NO copies el contenido técnico (los CRUDs, Insumos o el sistema HIS).
+      Debes inventar el "detalleTecnico" basándote ESTRICTAMENTE en el Contexto/Explicación del proyecto actual (puede ser un reporte gerencial, una API, una web, etc.), pero manteniendo esta misma estructura de JSON y Markdown:
+      ${ejemploIdeal}
     `;
 
     const requestPayload = {
-      model: config.AI_MODEL || 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
+      contents: [
+        {
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ]
     };
 
+    let apiUrl = config.AI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
     const response = await axios.post(
-      config.AI_API_URL,
+      apiUrl,
       requestPayload,
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.AI_API_KEY}`,
+          'X-goog-api-key': config.AI_API_KEY
         },
       }
     );
 
-    const resultText = response.data.choices[0].message.content.trim();
+    const rawResponse = response.data;
+    let resultText = '';
+
+    if (rawResponse.candidates && rawResponse.candidates[0].content.parts[0].text) {
+      resultText = rawResponse.candidates[0].content.parts[0].text.trim();
+    } else {
+      throw new Error('Unexpected response structure from Gemini API');
+    }
 
     logAITransaction(projectData.projectId, projectData.title, requestPayload, resultText, 'raw');
 
@@ -103,9 +185,14 @@ const generateProjectPlan = async (projectData) => {
     }
 
     logAITransaction(projectData.projectId, projectData.title, requestPayload, jsonResult, 'success');
-
     return jsonResult;
+
   } catch (error) {
+    if (error.response) {
+       console.error("AI API Error Response:", error.response.data);
+    } else {
+       console.error("Error al generar el plan:", error);
+    }
     throw error;
   }
 };

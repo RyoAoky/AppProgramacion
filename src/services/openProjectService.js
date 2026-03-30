@@ -46,6 +46,25 @@ const createWorkPackage = async (projectId, workPackageData) => {
   }
 };
 
+const updateWorkPackage = async (workPackageId, workPackageData) => {
+  try {
+    const api = getAxiosInstance();
+    const lockResponse = await api.get(`/api/v3/work_packages/${workPackageId}`);
+    const lockVersion = lockResponse.data.lockVersion;
+
+    const response = await api.patch(
+      `/api/v3/work_packages/${workPackageId}`,
+      {
+        ...workPackageData,
+        lockVersion: lockVersion
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 const integrateProjectData = async (aiData) => {
   try {
     const targetProjectId = aiData.projectId;
@@ -54,57 +73,35 @@ const integrateProjectData = async (aiData) => {
         throw new Error('Project ID is required to sync data');
     }
 
-    const summaryTasksMap = {};
+    const tasksArray = Array.isArray(aiData) ? aiData : (aiData.tasks || []);
 
-    for (const summaryTask of aiData.summaryTasks || []) {
-       const wp = await createWorkPackage(targetProjectId, {
-          subject: summaryTask.title,
-          description: { format: 'markdown', raw: summaryTask.description || '' },
-          startDate: summaryTask.startDate,
-          dueDate: summaryTask.endDate,
-          estimatedTime: summaryTask.estimatedTime,
-       });
-       summaryTasksMap[summaryTask.id || summaryTask.title] = wp.id;
-    }
+    for (const parentTask of tasksArray) {
+       if (!parentTask.id) continue;
 
-    const individualTasksMap = {};
+       const parentPayload = {};
+       if (parentTask.fechaInicio) parentPayload.startDate = parentTask.fechaInicio;
+       if (parentTask.fechaFin) parentPayload.dueDate = parentTask.fechaFin;
+       if (parentTask.horasEstimadas !== undefined) parentPayload.estimatedTime = `PT${parentTask.horasEstimadas}H`;
 
-    for (const task of aiData.individualTasks || []) {
-      const parentId = summaryTasksMap[task.parentId || task.parentTitle];
-      const payload = {
-          subject: task.title,
-          description: { format: 'markdown', raw: task.description || '' },
-          startDate: task.startDate,
-          dueDate: task.endDate,
-          estimatedTime: task.estimatedTime,
-      };
-      if (parentId) {
-         payload._links = {
-             parent: { href: `/api/v3/work_packages/${parentId}` }
-         }
-      }
-      const wp = await createWorkPackage(targetProjectId, payload);
-      individualTasksMap[task.id || task.title] = wp.id;
+       if (Object.keys(parentPayload).length > 0) {
+           await updateWorkPackage(parentTask.id, parentPayload);
+       }
 
-      for (const miniTask of task.miniTasks || []) {
-         await createWorkPackage(targetProjectId, {
-              subject: miniTask.title,
-              description: { format: 'markdown', raw: miniTask.description || '' },
-              estimatedTime: miniTask.estimatedTime,
-              _links: {
-                  parent: { href: `/api/v3/work_packages/${wp.id}` }
-              }
-         });
-      }
-    }
+       for (const childTask of parentTask.hijos || []) {
+          if (!childTask.id) continue;
 
-    for (const meeting of aiData.meetings || []) {
-       await createWorkPackage(targetProjectId, {
-           subject: meeting.title,
-           description: { format: 'markdown', raw: meeting.description || '' },
-           startDate: meeting.suggestedDate,
-           dueDate: meeting.suggestedDate,
-       });
+          const childPayload = {};
+          if (childTask.fechaInicio) childPayload.startDate = childTask.fechaInicio;
+          if (childTask.fechaFin) childPayload.dueDate = childTask.fechaFin;
+          if (childTask.horasEstimadas !== undefined) childPayload.estimatedTime = `PT${childTask.horasEstimadas}H`;
+          if (childTask.detalleTecnico) {
+              childPayload.description = { format: 'markdown', raw: childTask.detalleTecnico };
+          }
+
+          if (Object.keys(childPayload).length > 0) {
+              await updateWorkPackage(childTask.id, childPayload);
+          }
+       }
     }
 
     return { success: true, projectId: targetProjectId };
