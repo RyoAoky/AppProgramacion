@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { generateProjectPlan } = require('../services/aiService');
 const { integrateProjectData } = require('../services/openProjectService');
 
@@ -61,7 +63,54 @@ const syncOpenProject = async (req, res) => {
   }
 };
 
+const getProjectHistory = (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const rootDir = path.join(__dirname, '../../planeaciones');
+    if (!fs.existsSync(rootDir)) return res.json({ history: [] });
+
+    const folders = fs.readdirSync(rootDir);
+    const projectFolder = folders.find(folder => folder.startsWith(`${projectId}-`));
+
+    if (!projectFolder) return res.json({ history: [] });
+
+    const folderPath = path.join(rootDir, projectFolder);
+    const files = fs.readdirSync(folderPath);
+
+    const successFiles = files
+      .filter(file => file.endsWith('-success.json'))
+      .sort((a, b) => b.localeCompare(a));
+
+    return res.json({ history: successFiles });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error reading history' });
+  }
+};
+
+const getProjectHistoryDetail = (req, res) => {
+  try {
+    const { projectId, filename } = req.params;
+    const rootDir = path.join(__dirname, '../../planeaciones');
+    const folders = fs.readdirSync(rootDir);
+    const projectFolder = folders.find(folder => folder.startsWith(`${projectId}-`));
+
+    if (!projectFolder) return res.status(404).json({ error: 'Project folder not found' });
+
+    const filePath = path.join(rootDir, projectFolder, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const jsonData = JSON.parse(fileContent);
+
+    return res.json({ data: jsonData });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error reading history detail' });
+  }
+};
+
 module.exports = {
   generatePlanning,
-  syncOpenProject
+  syncOpenProject,
+  getProjectHistory,
+  getProjectHistoryDetail
 };

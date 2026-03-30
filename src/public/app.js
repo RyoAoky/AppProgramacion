@@ -7,11 +7,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusMessage = document.getElementById('statusMessage');
   const generationModal = new bootstrap.Modal(document.getElementById('generationModal'));
   const btnConfirmGeneration = document.getElementById('btnConfirmGeneration');
+  const btnConfirmGenerationSpinner = document.getElementById('btnConfirmGenerationSpinner');
   const projectExplanation = document.getElementById('projectExplanation');
   const projectStartDate = document.getElementById('projectStartDate');
 
+  const historySelect = document.getElementById('historySelect');
+  const btnLoadHistory = document.getElementById('btnLoadHistory');
+
   const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
   const aiProposalContent = document.getElementById('aiProposalContent');
+  const opFormatTableBody = document.querySelector('#opFormatTable tbody');
   const btnApproveSync = document.getElementById('btnApproveSync');
 
   let currentAIProposal = null;
@@ -96,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.querySelectorAll('.btn-generate').forEach(btn => {
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', async (e) => {
             currentTargetProject = {
               id: e.target.getAttribute('data-id'),
               name: e.target.getAttribute('data-name')
@@ -107,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             projectStartDate.value = today.toISOString().split('T')[0];
 
+            await loadHistoryOptions(currentTargetProject.id);
             generationModal.show();
           });
         });
@@ -118,6 +124,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const loadHistoryOptions = async (projectId) => {
+    historySelect.innerHTML = '<option value="">Cargando historial...</option>';
+    try {
+      const res = await fetch(`/api/history/${projectId}`);
+      const data = await res.json();
+      historySelect.innerHTML = '<option value="">Selecciona una planeación previa...</option>';
+      if (data.history && data.history.length > 0) {
+        data.history.forEach(file => {
+           const option = document.createElement('option');
+           option.value = file;
+           option.textContent = file;
+           historySelect.appendChild(option);
+        });
+      } else {
+         historySelect.innerHTML = '<option value="">No hay historial previo.</option>';
+      }
+    } catch (e) {
+      historySelect.innerHTML = '<option value="">Error al cargar historial.</option>';
+    }
+  };
+
+  const handleLoadHistoryClick = async () => {
+     const selectedFile = historySelect.value;
+     if (!selectedFile) {
+        Swal.fire('Atención', 'Por favor selecciona un archivo del historial.', 'warning');
+        return;
+     }
+
+     try {
+       const res = await fetch(`/api/history/${currentTargetProject.id}/${selectedFile}`);
+       if (!res.ok) throw new Error('No se pudo cargar el detalle del historial');
+       const json = await res.json();
+
+       generationModal.hide();
+       currentAIProposal = json.data.response;
+       showValidationModal(currentAIProposal);
+
+     } catch (e) {
+       Swal.fire('Error', e.message, 'error');
+     }
+  };
+
   const confirmGeneration = async () => {
     if (!currentTargetProject) return;
 
@@ -125,12 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const startDate = projectStartDate.value;
 
     if (!explanation || !startDate) {
-        alert('Debes ingresar la explicación y la fecha de inicio.');
+        Swal.fire('Atención', 'Debes ingresar la explicación y la fecha de inicio.', 'warning');
         return;
     }
 
-    generationModal.hide();
+    btnConfirmGeneration.disabled = true;
+    btnConfirmGenerationSpinner.classList.remove('d-none');
+
     await triggerAIGeneration(currentTargetProject.id, currentTargetProject.name, explanation, startDate);
+
+    btnConfirmGeneration.disabled = false;
+    btnConfirmGenerationSpinner.classList.add('d-none');
   };
 
   const triggerAIGeneration = async (projectId, projectName, explanation, startDate) => {
@@ -159,30 +212,93 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(errorMsg);
       }
 
-      currentAIProposal = json.data;
-      aiProposalContent.textContent = JSON.stringify(currentAIProposal, null, 2);
-      validationModal.show();
+      generationModal.hide();
+      currentAIProposal = json.data.tasks.tasks;
+      showValidationModal(currentAIProposal);
       showStatus('Esperando confirmación humana...');
 
     } catch (error) {
+      generationModal.hide();
+      Swal.fire('Error en la IA', error.message, 'error');
       showStatus(`Error: ${error.message}`, true);
     }
+  };
+
+  const showValidationModal = (proposalData) => {
+    aiProposalContent.textContent = JSON.stringify(proposalData, null, 2);
+
+    opFormatTableBody.innerHTML = '';
+
+    if (Array.isArray(proposalData)) {
+       proposalData.forEach(parent => {
+          const parentRow = document.createElement('tr');
+          parentRow.innerHTML = `
+            <td>${parent.id}</td>
+            <td class="fw-bold"><i class="bi bi-chevron-down"></i> ${parent.asunto}</td>
+            <td class="text-warning fw-bold">${parent.tipo.toUpperCase()}</td>
+            <td><span class="badge bg-secondary">Nuevo</span></td>
+            <td>${parent.fechaInicio}</td>
+            <td>${parent.horasEstimadas}h</td>
+          `;
+          opFormatTableBody.appendChild(parentRow);
+
+          if (parent.hijos && Array.isArray(parent.hijos)) {
+             parent.hijos.forEach(hijo => {
+                const childRow = document.createElement('tr');
+                childRow.innerHTML = `
+                  <td>${hijo.id}</td>
+                  <td class="ps-4">
+                     ${hijo.asunto}
+                     <div class="mt-2 text-muted small" style="white-space: pre-wrap;"><strong>Detalle Técnico:</strong>\n${hijo.detalleTecnico || 'Sin detalle'}</div>
+                  </td>
+                  <td class="text-primary">${hijo.tipo.toUpperCase()}</td>
+                  <td><span class="badge bg-secondary">Nuevo</span></td>
+                  <td>${hijo.fechaInicio}</td>
+                  <td>${hijo.horasEstimadas}h</td>
+                `;
+                opFormatTableBody.appendChild(childRow);
+             });
+          }
+       });
+    }
+
+    validationModal.show();
   };
 
   const syncToOpenProject = async () => {
     if (!currentAIProposal) return;
     validationModal.hide();
+
     showStatus('Enviando aprobación y sincronizando...');
+
+    let timerInterval;
+    Swal.fire({
+      title: 'Sincronizando con OpenProject...',
+      html: 'Por favor espera, no cierres la ventana.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
+      const payload = {
+        projectId: currentTargetProject.id,
+        tasks: currentAIProposal
+      };
+
       const res = await fetch('/api/sync-openproject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentAIProposal)
+        body: JSON.stringify(payload)
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Fallo de sincronización');
+
+      Swal.fire('¡Éxito!', 'Sincronización finalizada exitosamente.', 'success');
       showStatus('Sincronización finalizada exitosamente.');
     } catch (error) {
+      Swal.fire('Error', `Fallo la sincronización: ${error.message}`, 'error');
       showStatus(`Error de sincronización: ${error.message}`, true);
     }
   };
@@ -203,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   configForm.addEventListener('submit', updateConfig);
   refreshProjectsBtn.addEventListener('click', loadProjects);
   btnConfirmGeneration.addEventListener('click', confirmGeneration);
+  btnLoadHistory.addEventListener('click', handleLoadHistoryClick);
   btnApproveSync.addEventListener('click', syncToOpenProject);
 
   loadConfig();

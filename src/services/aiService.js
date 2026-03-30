@@ -21,8 +21,10 @@ const logAITransaction = (projectId, projectName, reqData, resData, type) => {
     const filePath = path.join(projectFolder, `${timestamp}-${type}.json`);
 
     fs.writeFileSync(filePath, JSON.stringify({ request: reqData, response: resData }, null, 2), 'utf8');
+    return `${timestamp}-${type}.json`;
   } catch (error) {
     console.error('Logging failed:', error);
+    return null;
   }
 };
 
@@ -184,8 +186,9 @@ const generateProjectPlan = async (projectData) => {
         }
     }
 
-    logAITransaction(projectData.projectId, projectData.title, requestPayload, jsonResult, 'success');
-    return jsonResult;
+    const savedFilename = logAITransaction(projectData.projectId, projectData.title, requestPayload, jsonResult, 'success');
+
+    return { tasks: jsonResult, historyFile: savedFilename };
 
   } catch (error) {
     if (error.response) {
