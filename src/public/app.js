@@ -16,8 +16,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
   const aiProposalContent = document.getElementById('aiProposalContent');
-  const opFormatTableBody = document.querySelector('#opFormatTable tbody');
+  const opAccordion = document.getElementById('opAccordion');
   const btnApproveSync = document.getElementById('btnApproveSync');
+
+  const summaryStartDate = document.getElementById('summaryStartDate');
+  const summaryEndDate = document.getElementById('summaryEndDate');
+  const summaryTotalHours = document.getElementById('summaryTotalHours');
+  const summaryContext = document.getElementById('summaryContext');
 
   let currentAIProposal = null;
   let currentTargetProject = null;
@@ -157,9 +162,18 @@ document.addEventListener('DOMContentLoaded', () => {
        if (!res.ok) throw new Error('No se pudo cargar el detalle del historial');
        const json = await res.json();
 
+       let extractedContext = '-';
+       if (json.data.request && json.data.request.contents && json.data.request.contents[0].parts && json.data.request.contents[0].parts[0].text) {
+         const promptText = json.data.request.contents[0].parts[0].text;
+         const contextMatch = promptText.match(/Contexto\/Explicación:\s*(.*?)\n\s*Fecha de Inicio/);
+         if (contextMatch) {
+            extractedContext = contextMatch[1].trim();
+         }
+       }
+
        generationModal.hide();
        currentAIProposal = json.data.response;
-       showValidationModal(currentAIProposal);
+       showValidationModal(currentAIProposal, extractedContext);
 
      } catch (e) {
        Swal.fire('Error', e.message, 'error');
@@ -214,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       generationModal.hide();
       currentAIProposal = json.data.tasks.tasks;
-      showValidationModal(currentAIProposal);
+      showValidationModal(currentAIProposal, explanation);
       showStatus('Esperando confirmación humana...');
 
     } catch (error) {
@@ -224,42 +238,92 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const showValidationModal = (proposalData) => {
+  const showValidationModal = (proposalData, contextText = '-') => {
     aiProposalContent.textContent = JSON.stringify(proposalData, null, 2);
+    summaryContext.textContent = contextText;
 
-    opFormatTableBody.innerHTML = '';
+    opAccordion.innerHTML = '';
 
     if (Array.isArray(proposalData)) {
-       proposalData.forEach(parent => {
-          const parentRow = document.createElement('tr');
-          parentRow.innerHTML = `
-            <td>${parent.id}</td>
-            <td class="fw-bold"><i class="bi bi-chevron-down"></i> ${parent.asunto}</td>
-            <td class="text-warning fw-bold">${parent.tipo.toUpperCase()}</td>
-            <td><span class="badge bg-secondary">Nuevo</span></td>
-            <td>${parent.fechaInicio}</td>
-            <td>${parent.horasEstimadas}h</td>
-          `;
-          opFormatTableBody.appendChild(parentRow);
+       let globalStartDate = null;
+       let globalEndDate = null;
+       let totalHours = 0;
 
-          if (parent.hijos && Array.isArray(parent.hijos)) {
-             parent.hijos.forEach(hijo => {
-                const childRow = document.createElement('tr');
-                childRow.innerHTML = `
-                  <td>${hijo.id}</td>
-                  <td class="ps-4">
-                     ${hijo.asunto}
-                     <div class="mt-2 text-muted small" style="white-space: pre-wrap;"><strong>Detalle Técnico:</strong>\n${hijo.detalleTecnico || 'Sin detalle'}</div>
-                  </td>
-                  <td class="text-primary">${hijo.tipo.toUpperCase()}</td>
-                  <td><span class="badge bg-secondary">Nuevo</span></td>
-                  <td>${hijo.fechaInicio}</td>
-                  <td>${hijo.horasEstimadas}h</td>
-                `;
-                opFormatTableBody.appendChild(childRow);
-             });
+       proposalData.forEach((parent, index) => {
+          if (!globalStartDate || new Date(parent.fechaInicio) < new Date(globalStartDate)) {
+              globalStartDate = parent.fechaInicio;
           }
+          if (!globalEndDate || new Date(parent.fechaFin) > new Date(globalEndDate)) {
+              globalEndDate = parent.fechaFin;
+          }
+          totalHours += parseFloat(parent.horasEstimadas || 0);
+
+          const accordionId = `collapse-${parent.id}`;
+          const headerId = `heading-${parent.id}`;
+
+          let childrenTableHtml = '';
+          if (parent.hijos && Array.isArray(parent.hijos)) {
+             childrenTableHtml = `
+               <div class="table-responsive mt-3">
+                 <table class="table table-hover table-sm">
+                   <thead class="table-light">
+                     <tr>
+                       <th>ID</th>
+                       <th>Asunto</th>
+                       <th>Tipo</th>
+                       <th>Estado</th>
+                       <th>Inicio</th>
+                       <th>Fin</th>
+                       <th>Horas</th>
+                     </tr>
+                   </thead>
+                   <tbody>
+             `;
+             parent.hijos.forEach(hijo => {
+                childrenTableHtml += `
+                  <tr>
+                    <td>${hijo.id}</td>
+                    <td>
+                       ${hijo.asunto}
+                       <div class="mt-2 text-muted small" style="white-space: pre-wrap;"><strong>Detalle Técnico:</strong>\n${hijo.detalleTecnico || 'Sin detalle'}</div>
+                    </td>
+                    <td class="text-primary">${hijo.tipo.toUpperCase()}</td>
+                    <td><span class="badge bg-secondary">Nuevo</span></td>
+                    <td>${hijo.fechaInicio}</td>
+                    <td>${hijo.fechaFin}</td>
+                    <td>${hijo.horasEstimadas}h</td>
+                  </tr>
+                `;
+             });
+             childrenTableHtml += `</tbody></table></div>`;
+          } else {
+             childrenTableHtml = '<p class="text-muted mt-3">Sin subtareas.</p>';
+          }
+
+          const accordionItem = document.createElement('div');
+          accordionItem.className = 'accordion-item';
+          accordionItem.innerHTML = `
+            <h2 class="accordion-header" id="${headerId}">
+              <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}" aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="${accordionId}">
+                <strong>[${parent.id}] ${parent.asunto}</strong>&nbsp;- ${parent.horasEstimadas}h (${parent.fechaInicio} al ${parent.fechaFin})
+              </button>
+            </h2>
+            <div id="${accordionId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" aria-labelledby="${headerId}" data-bs-parent="#opAccordion">
+              <div class="accordion-body">
+                ${childrenTableHtml}
+              </div>
+            </div>
+          `;
+          opAccordion.appendChild(accordionItem);
        });
+
+       summaryStartDate.textContent = globalStartDate || '-';
+       summaryEndDate.textContent = globalEndDate || '-';
+       summaryTotalHours.textContent = totalHours.toFixed(2) + 'h';
+    } else {
+       summaryStartDate.textContent = '-';
+       summaryEndDate.textContent = '-';
+       summaryTotalHours.textContent = '-';
     }
 
     validationModal.show();
