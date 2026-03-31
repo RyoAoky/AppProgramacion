@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Project Orchestrator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container mt-5">
+    <h1>AI Project Orchestrator Dashboard</h1>
+
+    <div class="card mb-4 mt-4">
+      <div class="card-header">Configuración de APIs</div>
+      <div class="card-body">
+        <form id="configForm">
+          <div class="mb-3">
+            <label class="form-label" for="AI_API_URL">AI API URL</label>
+            <input type="text" class="form-control" id="AI_API_URL">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="AI_API_KEY">AI API Key</label>
+            <input type="password" class="form-control" id="AI_API_KEY">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="AI_MODEL">AI Model</label>
+            <input type="text" class="form-control" id="AI_MODEL" value="gpt-4">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="OPENPROJECT_API_URL">OpenProject API URL</label>
+            <input type="text" class="form-control" id="OPENPROJECT_API_URL">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="OPENPROJECT_API_KEY">OpenProject API Key</label>
+            <input type="password" class="form-control" id="OPENPROJECT_API_KEY">
+          </div>
+          <button type="submit" class="btn btn-primary">Guardar y Validar Configuración</button>
+        </form>
+        <div id="configStatus" class="mt-2 text-success" style="display: none;"></div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Listado de Proyectos</span>
+        <button id="refreshProjects" class="btn btn-sm btn-outline-secondary">Refrescar</button>
+      </div>
+      <div class="card-body">
+         <div class="table-responsive">
+            <table class="table" id="projectsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Identificador</th>
+                  <th>Descripción</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+         </div>
+      </div>
+    </div>
+
+    <div id="statusBar" class="alert alert-info" style="display: none;">
+      <strong>Estado:</strong> <span id="statusMessage">Esperando...</span>
+    </div>
+  </div>
+
+  <div class="modal fade" id="generationModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Generar Planeación IA</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="generationForm">
+            <div class="mb-3">
+              <label class="form-label" for="projectExplanation">Contexto / Explicación del Proyecto</label>
+              <textarea class="form-control" id="projectExplanation" rows="4" placeholder="Explica detalles adicionales que la IA debe considerar..." required></textarea>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="projectStartDate">Fecha de Inicio del Proyecto</label>
+              <input type="date" class="form-control" id="projectStartDate" required>
+            </div>
+          </form>
+          <hr>
+          <h6>Historial de Planeaciones</h6>
+          <div class="d-flex mb-3">
+            <select id="historySelect" class="form-select me-2">
+              <option value="">Selecciona una planeación previa...</option>
+            </select>
+            <button type="button" class="btn btn-info" id="btnLoadHistory">Cargar</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmGeneration">
+             <span class="spinner-border spinner-border-sm d-none" id="btnConfirmGenerationSpinner" role="status" aria-hidden="true"></span>
+             Iniciar IA
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="validationModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Revisión de Propuesta de IA</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+             <div class="col-md-3">
+               <strong>Fecha de Inicio Global:</strong> <span id="summaryStartDate" class="text-primary">-</span>
+             </div>
+             <div class="col-md-3">
+               <strong>Fecha de Fin Global:</strong> <span id="summaryEndDate" class="text-primary">-</span>
+             </div>
+             <div class="col-md-3">
+               <strong>Horas Estimadas (Total):</strong> <span id="summaryTotalHours" class="text-success">-</span>
+             </div>
+          </div>
+          <div class="mb-3">
+             <strong>Contexto Solicitado a la IA:</strong>
+             <div id="summaryContext" class="p-2 bg-light border rounded small" style="max-height: 100px; overflow-y: auto;">-</div>
+          </div>
+
+          <ul class="nav nav-tabs" id="proposalTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="openproject-tab" data-bs-toggle="tab" data-bs-target="#openproject-tab-pane" type="button" role="tab" aria-controls="openproject-tab-pane" aria-selected="true">Vista OpenProject</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-tab-pane" type="button" role="tab" aria-controls="json-tab-pane" aria-selected="false">Vista JSON Raw</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="proposalTabsContent">
+            <div class="tab-pane fade show active p-3 border border-top-0 rounded-bottom" id="openproject-tab-pane" role="tabpanel" aria-labelledby="openproject-tab" tabindex="0">
+              <div class="accordion" id="opAccordion">
+                <!-- Accordion items will be generated here -->
+              </div>
+            </div>
+            <div class="tab-pane fade p-3 border border-top-0 rounded-bottom" id="json-tab-pane" role="tabpanel" aria-labelledby="json-tab" tabindex="0">
+              <pre id="aiProposalContent" class="bg-light p-3 border rounded" style="max-height: 500px; overflow-y: auto;"></pre>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btnApproveSync">Aprobar y Sincronizar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
