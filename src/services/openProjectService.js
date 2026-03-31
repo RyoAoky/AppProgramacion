@@ -170,10 +170,56 @@ const getProjects = async () => {
   }
 };
 
+const getDynamicProjectStructure = async (projectId) => {
+  try {
+    const workPackages = await getProjectWorkPackages(projectId);
+    const parentMap = new Map();
+    const allItemsMap = new Map();
+
+    workPackages.forEach(wp => {
+       const isParent = !wp._links.parent;
+       const taskObj = {
+          id: wp.id,
+          asunto: wp.subject,
+          tipo: wp._links.type.title || 'Tarea',
+       };
+       allItemsMap.set(wp.id, taskObj);
+
+       if (isParent) {
+          taskObj.hijos = [];
+          parentMap.set(wp.id, taskObj);
+       }
+    });
+
+    workPackages.forEach(wp => {
+       if (wp._links.parent) {
+          const parentHref = wp._links.parent.href;
+          const parentId = parseInt(parentHref.split('/').pop(), 10);
+          const childObj = allItemsMap.get(wp.id);
+          if (parentMap.has(parentId)) {
+             parentMap.get(parentId).hijos.push(childObj);
+          } else {
+             const fallbackParent = allItemsMap.get(parentId);
+             if (fallbackParent) {
+                 if (!fallbackParent.hijos) fallbackParent.hijos = [];
+                 fallbackParent.hijos.push(childObj);
+                 parentMap.set(parentId, fallbackParent);
+             }
+          }
+       }
+    });
+
+    return Array.from(parentMap.values()).sort((a, b) => a.id - b.id);
+  } catch (error) {
+    throw error;
+  }
+};
+
 module.exports = {
   integrateProjectData,
   createProject,
   createWorkPackage,
   getProjects,
-  getProjectWorkPackages
+  getProjectWorkPackages,
+  getDynamicProjectStructure
 };

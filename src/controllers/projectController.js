@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { generateProjectPlan } = require('../services/aiService');
-const { integrateProjectData } = require('../services/openProjectService');
+const { integrateProjectData, getDynamicProjectStructure } = require('../services/openProjectService');
 
 const { broadcastStatus } = require('../services/statusService');
 
@@ -13,7 +13,10 @@ const generatePlanning = async (req, res) => {
       return res.status(400).json({ error: 'Missing required project data' });
     }
 
-    const projectData = { projectId, title, description, startDate, summaryTasks, individualTasks };
+    broadcastStatus('Obteniendo estructura base de OpenProject...');
+    const dynamicStructure = await getDynamicProjectStructure(projectId);
+
+    const projectData = { projectId, title, description, startDate, summaryTasks, individualTasks, dynamicStructure };
 
     broadcastStatus('Conectando con IA...');
     const aiPlan = await generateProjectPlan(projectData);

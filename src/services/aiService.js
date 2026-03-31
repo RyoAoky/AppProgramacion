@@ -28,17 +28,6 @@ const logAITransaction = (projectId, projectName, reqData, resData, type) => {
   }
 };
 
-const getProjectStructure = () => {
-  try {
-    const dataPath = path.join(__dirname, '../data/projectStructure.json');
-    if (fs.existsSync(dataPath)) {
-      return fs.readFileSync(dataPath, 'utf8');
-    }
-  } catch (e) {
-  }
-  return '[]';
-};
-
 const obtenerEjemploPerfectoJSON = () => {
   return JSON.stringify([
     {
@@ -94,7 +83,7 @@ const obtenerEjemploPerfectoJSON = () => {
 const generateProjectPlan = async (projectData) => {
   const config = getConfig();
   try {
-    const structureTemplate = getProjectStructure();
+    const structureTemplate = JSON.stringify(projectData.dynamicStructure || [], null, 2);
     const ejemploIdeal = obtenerEjemploPerfectoJSON();
 
     const prompt = `
